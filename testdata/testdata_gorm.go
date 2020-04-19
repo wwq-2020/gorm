@@ -189,8 +189,8 @@ type Filter interface {
 // JoinableFilter JoinableFilter
 type JoinableFilter interface {
 	Filter
-	Or(Filter) JoinableFilter
-	And(Filter) JoinableFilter
+	Or(...Filter) JoinableFilter
+	And(...Filter) JoinableFilter
 }
 
 type filter struct {
@@ -206,17 +206,33 @@ func (f *filter) Args() []interface{} {
 	return f.args
 }
 
-func (f *filter) And(and Filter) JoinableFilter {
+func (f *filter) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(f.Args()))
+	conds = append(conds, f.Cond())
+	args = append(args, f.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", f.Cond(), ") and (", and.Cond(), ")"}, ""),
-		args: append(f.Args(), and.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
-func (f *filter) Or(or Filter) JoinableFilter {
+func (f *filter) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(f.Args()))
+	conds = append(conds, f.Cond())
+	args = append(args, f.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", f.Cond(), ") or (", or.Cond(), ")"}, ""),
-		args: append(f.Args(), or.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -262,8 +278,12 @@ type SorterBuilder interface {
 }
 
 // Join Join
-func (s Sorter) Join(sorterBuilder SorterBuilder) JoinableSorterBuilder {
-	return Sorter(string(s) + "," + sorterBuilder.Build())
+func (s Sorter) Join(sorterBuilders ...SorterBuilder) JoinableSorterBuilder {
+	result := string(s)
+	for _, sorterBuilder := range sorterBuilders {
+		result += "," + sorterBuilder.Build()
+	}
+	return Sorter(result)
 }
 
 // Build Build
@@ -274,7 +294,7 @@ func (s Sorter) Build() string {
 // JoinableSorterBuilder JoinableSorterBuilder
 type JoinableSorterBuilder interface {
 	SorterBuilder
-	Join(SorterBuilder) JoinableSorterBuilder
+	Join(...SorterBuilder) JoinableSorterBuilder
 }
 
 // ID ID
@@ -304,18 +324,34 @@ func (n IDEq) Args() []interface{} {
 }
 
 // And And
-func (n IDEq) And(f Filter) JoinableFilter {
+func (n IDEq) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n IDEq) Or(f Filter) JoinableFilter {
+func (n IDEq) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -333,18 +369,34 @@ func (n IDNE) Args() []interface{} {
 }
 
 // And And
-func (n IDNE) And(f Filter) JoinableFilter {
+func (n IDNE) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n IDNE) Or(f Filter) JoinableFilter {
+func (n IDNE) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -362,18 +414,34 @@ func (n IDBt) Args() []interface{} {
 }
 
 // And And
-func (n IDBt) And(f Filter) JoinableFilter {
+func (n IDBt) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n IDBt) Or(f Filter) JoinableFilter {
+func (n IDBt) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -391,18 +459,34 @@ func (n IDLt) Args() []interface{} {
 }
 
 // And And
-func (n IDLt) And(f Filter) JoinableFilter {
+func (n IDLt) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n IDLt) Or(f Filter) JoinableFilter {
+func (n IDLt) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -420,18 +504,34 @@ func (n IDBE) Args() []interface{} {
 }
 
 // And And
-func (n IDBE) And(f Filter) JoinableFilter {
+func (n IDBE) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n IDBE) Or(f Filter) JoinableFilter {
+func (n IDBE) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -449,18 +549,34 @@ func (n IDLE) Args() []interface{} {
 }
 
 // And And
-func (n IDLE) And(f Filter) JoinableFilter {
+func (n IDLE) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n IDLE) Or(f Filter) JoinableFilter {
+func (n IDLE) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -486,18 +602,34 @@ func (n IDIn) Args() []interface{} {
 }
 
 // And And
-func (n IDIn) And(f Filter) JoinableFilter {
+func (n IDIn) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n IDIn) Or(f Filter) JoinableFilter {
+func (n IDIn) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -523,18 +655,34 @@ func (n IDNotIn) Args() []interface{} {
 }
 
 // And And
-func (n IDNotIn) And(f Filter) JoinableFilter {
+func (n IDNotIn) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n IDNotIn) Or(f Filter) JoinableFilter {
+func (n IDNotIn) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -573,18 +721,34 @@ func (n NameEq) Args() []interface{} {
 }
 
 // And And
-func (n NameEq) And(f Filter) JoinableFilter {
+func (n NameEq) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n NameEq) Or(f Filter) JoinableFilter {
+func (n NameEq) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -602,18 +766,34 @@ func (n NameNE) Args() []interface{} {
 }
 
 // And And
-func (n NameNE) And(f Filter) JoinableFilter {
+func (n NameNE) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n NameNE) Or(f Filter) JoinableFilter {
+func (n NameNE) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -631,18 +811,34 @@ func (n NameBt) Args() []interface{} {
 }
 
 // And And
-func (n NameBt) And(f Filter) JoinableFilter {
+func (n NameBt) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n NameBt) Or(f Filter) JoinableFilter {
+func (n NameBt) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -660,18 +856,34 @@ func (n NameLt) Args() []interface{} {
 }
 
 // And And
-func (n NameLt) And(f Filter) JoinableFilter {
+func (n NameLt) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n NameLt) Or(f Filter) JoinableFilter {
+func (n NameLt) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -689,18 +901,34 @@ func (n NameBE) Args() []interface{} {
 }
 
 // And And
-func (n NameBE) And(f Filter) JoinableFilter {
+func (n NameBE) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n NameBE) Or(f Filter) JoinableFilter {
+func (n NameBE) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -718,18 +946,34 @@ func (n NameLE) Args() []interface{} {
 }
 
 // And And
-func (n NameLE) And(f Filter) JoinableFilter {
+func (n NameLE) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n NameLE) Or(f Filter) JoinableFilter {
+func (n NameLE) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -755,18 +999,34 @@ func (n NameIn) Args() []interface{} {
 }
 
 // And And
-func (n NameIn) And(f Filter) JoinableFilter {
+func (n NameIn) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n NameIn) Or(f Filter) JoinableFilter {
+func (n NameIn) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -792,18 +1052,34 @@ func (n NameNotIn) Args() []interface{} {
 }
 
 // And And
-func (n NameNotIn) And(f Filter) JoinableFilter {
+func (n NameNotIn) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n NameNotIn) Or(f Filter) JoinableFilter {
+func (n NameNotIn) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -842,18 +1118,34 @@ func (n PasswordEq) Args() []interface{} {
 }
 
 // And And
-func (n PasswordEq) And(f Filter) JoinableFilter {
+func (n PasswordEq) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n PasswordEq) Or(f Filter) JoinableFilter {
+func (n PasswordEq) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -871,18 +1163,34 @@ func (n PasswordNE) Args() []interface{} {
 }
 
 // And And
-func (n PasswordNE) And(f Filter) JoinableFilter {
+func (n PasswordNE) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n PasswordNE) Or(f Filter) JoinableFilter {
+func (n PasswordNE) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -900,18 +1208,34 @@ func (n PasswordBt) Args() []interface{} {
 }
 
 // And And
-func (n PasswordBt) And(f Filter) JoinableFilter {
+func (n PasswordBt) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n PasswordBt) Or(f Filter) JoinableFilter {
+func (n PasswordBt) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -929,18 +1253,34 @@ func (n PasswordLt) Args() []interface{} {
 }
 
 // And And
-func (n PasswordLt) And(f Filter) JoinableFilter {
+func (n PasswordLt) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n PasswordLt) Or(f Filter) JoinableFilter {
+func (n PasswordLt) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -958,18 +1298,34 @@ func (n PasswordBE) Args() []interface{} {
 }
 
 // And And
-func (n PasswordBE) And(f Filter) JoinableFilter {
+func (n PasswordBE) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n PasswordBE) Or(f Filter) JoinableFilter {
+func (n PasswordBE) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -987,18 +1343,34 @@ func (n PasswordLE) Args() []interface{} {
 }
 
 // And And
-func (n PasswordLE) And(f Filter) JoinableFilter {
+func (n PasswordLE) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n PasswordLE) Or(f Filter) JoinableFilter {
+func (n PasswordLE) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -1024,18 +1396,34 @@ func (n PasswordIn) Args() []interface{} {
 }
 
 // And And
-func (n PasswordIn) And(f Filter) JoinableFilter {
+func (n PasswordIn) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n PasswordIn) Or(f Filter) JoinableFilter {
+func (n PasswordIn) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -1061,18 +1449,34 @@ func (n PasswordNotIn) Args() []interface{} {
 }
 
 // And And
-func (n PasswordNotIn) And(f Filter) JoinableFilter {
+func (n PasswordNotIn) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n PasswordNotIn) Or(f Filter) JoinableFilter {
+func (n PasswordNotIn) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -1111,18 +1515,34 @@ func (n CreatedAtEq) Args() []interface{} {
 }
 
 // And And
-func (n CreatedAtEq) And(f Filter) JoinableFilter {
+func (n CreatedAtEq) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n CreatedAtEq) Or(f Filter) JoinableFilter {
+func (n CreatedAtEq) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -1140,18 +1560,34 @@ func (n CreatedAtNE) Args() []interface{} {
 }
 
 // And And
-func (n CreatedAtNE) And(f Filter) JoinableFilter {
+func (n CreatedAtNE) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n CreatedAtNE) Or(f Filter) JoinableFilter {
+func (n CreatedAtNE) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -1169,18 +1605,34 @@ func (n CreatedAtBt) Args() []interface{} {
 }
 
 // And And
-func (n CreatedAtBt) And(f Filter) JoinableFilter {
+func (n CreatedAtBt) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n CreatedAtBt) Or(f Filter) JoinableFilter {
+func (n CreatedAtBt) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -1198,18 +1650,34 @@ func (n CreatedAtLt) Args() []interface{} {
 }
 
 // And And
-func (n CreatedAtLt) And(f Filter) JoinableFilter {
+func (n CreatedAtLt) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n CreatedAtLt) Or(f Filter) JoinableFilter {
+func (n CreatedAtLt) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -1227,18 +1695,34 @@ func (n CreatedAtBE) Args() []interface{} {
 }
 
 // And And
-func (n CreatedAtBE) And(f Filter) JoinableFilter {
+func (n CreatedAtBE) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n CreatedAtBE) Or(f Filter) JoinableFilter {
+func (n CreatedAtBE) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -1256,18 +1740,34 @@ func (n CreatedAtLE) Args() []interface{} {
 }
 
 // And And
-func (n CreatedAtLE) And(f Filter) JoinableFilter {
+func (n CreatedAtLE) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n CreatedAtLE) Or(f Filter) JoinableFilter {
+func (n CreatedAtLE) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -1293,18 +1793,34 @@ func (n CreatedAtIn) Args() []interface{} {
 }
 
 // And And
-func (n CreatedAtIn) And(f Filter) JoinableFilter {
+func (n CreatedAtIn) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n CreatedAtIn) Or(f Filter) JoinableFilter {
+func (n CreatedAtIn) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
@@ -1330,18 +1846,34 @@ func (n CreatedAtNotIn) Args() []interface{} {
 }
 
 // And And
-func (n CreatedAtNotIn) And(f Filter) JoinableFilter {
+func (n CreatedAtNotIn) And(ands ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ands)+1)
+	args := make([]interface{}, 0, len(ands)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, and := range ands {
+		conds = append(conds, and.Cond())
+		args = append(args, and.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "and")),
+		args: args,
 	}
 }
 
 // Or Or
-func (n CreatedAtNotIn) Or(f Filter) JoinableFilter {
+func (n CreatedAtNotIn) Or(ors ...Filter) JoinableFilter {
+	conds := make([]string, 0, len(ors)+1)
+	args := make([]interface{}, 0, len(ors)+len(n.Args()))
+	conds = append(conds, n.Cond())
+	args = append(args, n.Args())
+	for _, or := range ors {
+		conds = append(conds, or.Cond())
+		args = append(args, or.Args())
+	}
 	return &filter{
-		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
-		args: append(n.Args(), f.Args()...),
+		cond: fmt.Sprintf("(%s)", strings.Join(conds, "or")),
+		args: args,
 	}
 }
 
