@@ -128,7 +128,6 @@ func main() {
 		return
 	}
 	if err := t.Execute(buf, tpl); err != nil {
-		fmt.Println("_------", err)
 		return
 	}
 	if buf.Len() != 0 {
