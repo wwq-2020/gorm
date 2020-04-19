@@ -29,6 +29,8 @@ type tpl struct {
 	Value       string
 	Scan        string
 	Fields      []*tplField
+	Lt          string
+	Bt          string
 }
 
 type tplField struct {
@@ -126,6 +128,7 @@ func main() {
 		return
 	}
 	if err := t.Execute(buf, tpl); err != nil {
+		fmt.Println("_------", err)
 		return
 	}
 	if buf.Len() != 0 {
@@ -199,6 +202,8 @@ func gen(structName, tableName string, buf *bytes.Buffer, st *ast.StructType) *t
 		Value:       strings.Join(value, ","),
 		Scan:        strings.Join(scan, ","),
 		Fields:      tplFields,
+		Lt:          "<",
+		Bt:          ">",
 	}
 
 }
