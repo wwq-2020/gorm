@@ -163,9 +163,16 @@ func gen(structName, tableName string, buf *bytes.Buffer, st *ast.StructType) *t
 		if field.Tag == nil {
 			continue
 		}
+		var typ string
 		ident, ok := field.Type.(*ast.Ident)
 		if !ok {
-			continue
+			selector, ok := field.Type.(*ast.SelectorExpr)
+			if !ok {
+				continue
+			}
+			typ = selector.X.(*ast.Ident).Name + "." + selector.Sel.Name
+		} else {
+			typ = ident.Name
 		}
 
 		trimedValue := strings.Trim(field.Tag.Value, "`")
@@ -177,7 +184,7 @@ func gen(structName, tableName string, buf *bytes.Buffer, st *ast.StructType) *t
 		placeHolder = append(placeHolder, "?")
 		tplFields = append(tplFields, &tplField{
 			Name:   name,
-			Type:   ident.Name,
+			Type:   typ,
 			Column: curColumn,
 		})
 	}

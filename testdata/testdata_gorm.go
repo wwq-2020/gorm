@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"time"
 )
 
 // UserRepo UserRepo
@@ -21,7 +22,7 @@ func NewUserRepo(db *sql.DB) *UserRepo {
 
 // Find Find
 func (rp UserRepo) Find(ctx context.Context, filter Filter) ([]*User, error) {
-	sql := fmt.Sprintf("select id,name,password from user where %s", filter.Cond())
+	sql := fmt.Sprintf("select id,name,password,created_at from user where %s", filter.Cond())
 	rows, err := rp.db.QueryContext(ctx, sql, filter.Args()...)
 	if err != nil {
 		return nil, err
@@ -30,7 +31,7 @@ func (rp UserRepo) Find(ctx context.Context, filter Filter) ([]*User, error) {
 	var results []*User
 	for rows.Next() {
 		result := &User{}
-		if err := rows.Scan(&result.ID, &result.Name, &result.Password); err != nil {
+		if err := rows.Scan(&result.ID, &result.Name, &result.Password, &result.CreatedAt); err != nil {
 			return nil, err
 		}
 		results = append(results, result)
@@ -79,7 +80,7 @@ func (rp UserRepo) Update(ctx context.Context, filter Filter, updates ...Updater
 
 // Create Create
 func (rp UserRepo) Create(ctx context.Context, obj *User) (int64, error) {
-	result, err := rp.db.ExecContext(ctx, "insert into user(id,name,password) (?,?,?)", obj.ID, obj.Name, obj.Password)
+	result, err := rp.db.ExecContext(ctx, "insert into user(id,name,password,created_at) (?,?,?,?)", obj.ID, obj.Name, obj.Password, obj.CreatedAt)
 	if err != nil {
 		return 0, err
 	}
@@ -92,12 +93,12 @@ func (rp UserRepo) Create(ctx context.Context, obj *User) (int64, error) {
 
 // BatchCreate BatchCreate
 func (rp UserRepo) BatchCreate(ctx context.Context, objs []*User) error {
-	sqlBaseStr := "insert into user(id,name,password) %s"
+	sqlBaseStr := "insert into user(id,name,password,created_at) %s"
 	sqlPlaceHolder := make([]string, 0, len(objs))
-	sqlArgs := make([]interface{}, 0, len(objs)*3)
+	sqlArgs := make([]interface{}, 0, len(objs)*4)
 	for _, obj := range objs {
-		sqlPlaceHolder = append(sqlPlaceHolder, "(?,?,?)")
-		sqlArgs = append(sqlArgs, obj.ID, obj.Name, obj.Password)
+		sqlPlaceHolder = append(sqlPlaceHolder, "(?,?,?,?)")
+		sqlArgs = append(sqlArgs, obj.ID, obj.Name, obj.Password, obj.CreatedAt)
 	}
 	sqlStr := fmt.Sprintf(sqlBaseStr, strings.Join(sqlPlaceHolder, ","))
 	if _, err := rp.db.ExecContext(ctx, sqlStr, sqlArgs...); err != nil {
@@ -258,6 +259,45 @@ func (n Password) And(f Filter) Filter {
 
 // Or Or
 func (n Password) Or(f Filter) Filter {
+	return &filter{
+		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
+		args: append(n.Args(), f.Args()...),
+	}
+}
+
+// CreatedAt CreatedAt
+type CreatedAt time.Time
+
+// Cond Cond
+func (n CreatedAt) Cond() string {
+	return "created_at=?"
+}
+
+// Args Args
+func (n CreatedAt) Args() []interface{} {
+	return []interface{}{n}
+}
+
+// Set Set
+func (n CreatedAt) Set() string {
+	return "created_at=?"
+}
+
+// Arg Arg
+func (n CreatedAt) Arg() interface{} {
+	return n
+}
+
+// And And
+func (n CreatedAt) And(f Filter) Filter {
+	return &filter{
+		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
+		args: append(n.Args(), f.Args()...),
+	}
+}
+
+// Or Or
+func (n CreatedAt) Or(f Filter) Filter {
 	return &filter{
 		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
 		args: append(n.Args(), f.Args()...),
