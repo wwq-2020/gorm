@@ -22,8 +22,14 @@ func NewUserRepo(db *sql.DB) *UserRepo {
 
 // Find Find
 func (rp UserRepo) Find(ctx context.Context, filter Filter) ([]*User, error) {
-	sql := fmt.Sprintf("select id,name,password,created_at from user where %s", filter.Cond())
-	rows, err := rp.db.QueryContext(ctx, sql, filter.Args()...)
+	var rows *sql.Rows
+	var err error
+	if filter.Cond() == "" {
+		rows, err = rp.db.QueryContext(ctx, "select id,name,password,created_at from user")
+	} else {
+		sql := fmt.Sprintf("select id,name,password,created_at from user where %s", filter.Cond())
+		rows, err = rp.db.QueryContext(ctx, sql, filter.Args()...)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -44,8 +50,14 @@ func (rp UserRepo) Find(ctx context.Context, filter Filter) ([]*User, error) {
 
 // Delete Delete
 func (rp UserRepo) Delete(ctx context.Context, filter Filter) (int64, error) {
-	sql := fmt.Sprintf("delete from user where %s", filter.Cond())
-	result, err := rp.db.ExecContext(ctx, sql, filter.Args()...)
+	var result sql.Result
+	var err error
+	if filter.Cond() == "" {
+		result, err = rp.db.ExecContext(ctx, "delete from user")
+	} else {
+		sql := fmt.Sprintf("delete from user where %s", filter.Cond())
+		result, err = rp.db.ExecContext(ctx, sql, filter.Args()...)
+	}
 	if err != nil {
 		return 0, err
 	}
@@ -57,17 +69,25 @@ func (rp UserRepo) Delete(ctx context.Context, filter Filter) (int64, error) {
 }
 
 // Update Update
-func (rp UserRepo) Update(ctx context.Context, filter Filter, updates ...Updater) (int64, error) {
-	updateStrs := make([]string, 0, len(updates))
-	updateArgs := make([]interface{}, 0, len(updates))
-	for _, update := range updates {
-		updateStrs = append(updateStrs, update.Set())
-		updateArgs = append(updateArgs, update.Arg())
+func (rp UserRepo) Update(ctx context.Context, filter Filter, updaters ...Updater) (int64, error) {
+	var result sql.Result
+	var err error
+	updateStrs := make([]string, 0, len(updaters))
+	updateArgs := make([]interface{}, 0, len(updaters))
+	for _, updater := range updaters {
+		updateStrs = append(updateStrs, updater.Set())
+		updateArgs = append(updateArgs, updater.Arg())
 	}
-	sqlBaseStr := "update user set  %s where %s"
-	sqlStr := fmt.Sprintf(sqlBaseStr, strings.Join(updateStrs, ","), filter.Cond())
-	sqlArgs := append(updateArgs, filter.Args())
-	result, err := rp.db.ExecContext(ctx, sqlStr, sqlArgs...)
+	if filter.Cond() == "" {
+		sqlBaseStr := "update user set %s"
+		sqlStr := fmt.Sprintf(sqlBaseStr, strings.Join(updateStrs, ","))
+		result, err = rp.db.ExecContext(ctx, sqlStr, updateArgs...)
+	} else {
+		sqlBaseStr := "update user set %s where %s"
+		sqlStr := fmt.Sprintf(sqlBaseStr, strings.Join(updateStrs, ","), filter.Cond())
+		sqlArgs := append(updateArgs, filter.Args())
+		result, err = rp.db.ExecContext(ctx, sqlStr, sqlArgs...)
+	}
 	if err != nil {
 		return 0, err
 	}
@@ -117,8 +137,13 @@ type Updater interface {
 type Filter interface {
 	Cond() string
 	Args() []interface{}
-	Or(Filter) Filter
-	And(Filter) Filter
+}
+
+// JoinableFilter JoinableFilter
+type JoinableFilter interface {
+	Filter
+	Or(Filter) JoinableFilter
+	And(Filter) JoinableFilter
 }
 
 type filter struct {
@@ -134,14 +159,14 @@ func (f *filter) Args() []interface{} {
 	return f.args
 }
 
-func (f *filter) And(and Filter) Filter {
+func (f *filter) And(and Filter) JoinableFilter {
 	return &filter{
 		cond: strings.Join([]string{"(", f.Cond(), ") and (", and.Cond(), ")"}, ""),
 		args: append(f.Args(), and.Args()...),
 	}
 }
 
-func (f *filter) Or(or Filter) Filter {
+func (f *filter) Or(or Filter) JoinableFilter {
 	return &filter{
 		cond: strings.Join([]string{"(", f.Cond(), ") or (", or.Cond(), ")"}, ""),
 		args: append(f.Args(), or.Args()...),
@@ -172,7 +197,7 @@ func (n ID) Arg() interface{} {
 }
 
 // And And
-func (n ID) And(f Filter) Filter {
+func (n ID) And(f Filter) JoinableFilter {
 	return &filter{
 		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
 		args: append(n.Args(), f.Args()...),
@@ -180,7 +205,7 @@ func (n ID) And(f Filter) Filter {
 }
 
 // Or Or
-func (n ID) Or(f Filter) Filter {
+func (n ID) Or(f Filter) JoinableFilter {
 	return &filter{
 		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
 		args: append(n.Args(), f.Args()...),
@@ -211,7 +236,7 @@ func (n Name) Arg() interface{} {
 }
 
 // And And
-func (n Name) And(f Filter) Filter {
+func (n Name) And(f Filter) JoinableFilter {
 	return &filter{
 		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
 		args: append(n.Args(), f.Args()...),
@@ -219,7 +244,7 @@ func (n Name) And(f Filter) Filter {
 }
 
 // Or Or
-func (n Name) Or(f Filter) Filter {
+func (n Name) Or(f Filter) JoinableFilter {
 	return &filter{
 		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
 		args: append(n.Args(), f.Args()...),
@@ -250,7 +275,7 @@ func (n Password) Arg() interface{} {
 }
 
 // And And
-func (n Password) And(f Filter) Filter {
+func (n Password) And(f Filter) JoinableFilter {
 	return &filter{
 		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
 		args: append(n.Args(), f.Args()...),
@@ -258,7 +283,7 @@ func (n Password) And(f Filter) Filter {
 }
 
 // Or Or
-func (n Password) Or(f Filter) Filter {
+func (n Password) Or(f Filter) JoinableFilter {
 	return &filter{
 		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
 		args: append(n.Args(), f.Args()...),
@@ -289,7 +314,7 @@ func (n CreatedAt) Arg() interface{} {
 }
 
 // And And
-func (n CreatedAt) And(f Filter) Filter {
+func (n CreatedAt) And(f Filter) JoinableFilter {
 	return &filter{
 		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
 		args: append(n.Args(), f.Args()...),
@@ -297,7 +322,7 @@ func (n CreatedAt) And(f Filter) Filter {
 }
 
 // Or Or
-func (n CreatedAt) Or(f Filter) Filter {
+func (n CreatedAt) Or(f Filter) JoinableFilter {
 	return &filter{
 		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
 		args: append(n.Args(), f.Args()...),

@@ -15,8 +15,14 @@ func New{{.Name}}Repo(db *sql.DB) *{{.Name}}Repo {
 
 // Find Find
 func (rp {{$.Name}}Repo) Find(ctx context.Context, filter Filter) ([]*{{.Name}}, error){
-	sql:= fmt.Sprintf("{{.FindSQL}} where %s", filter.Cond())
-	rows, err := rp.db.QueryContext(ctx, sql, filter.Args()... )
+	var rows *sql.Rows
+	var err error
+	if filter.Cond() == "" {
+		rows, err = rp.db.QueryContext(ctx, "{{.FindSQL}}")
+	} else {
+		sql:= fmt.Sprintf("{{.FindSQL}} where %s", filter.Cond())
+		rows, err = rp.db.QueryContext(ctx, sql, filter.Args()... )
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -37,8 +43,14 @@ func (rp {{$.Name}}Repo) Find(ctx context.Context, filter Filter) ([]*{{.Name}},
 
 // Delete Delete
 func (rp {{$.Name}}Repo) Delete(ctx context.Context, filter Filter) (int64, error){
-	sql:=fmt.Sprintf("{{.DeleteSQL}} where %s", filter.Cond())
-	result, err := rp.db.ExecContext(ctx, sql, filter.Args()... )
+	var result sql.Result
+	var err error
+	if filter.Cond() == "" {
+		result, err = rp.db.ExecContext(ctx, "{{.DeleteSQL}}")
+	} else {
+		sql:=fmt.Sprintf("{{.DeleteSQL}} where %s", filter.Cond())
+		result, err = rp.db.ExecContext(ctx, sql, filter.Args()... )
+	}
 	if err != nil {
 		return 0, err
 	}
@@ -50,17 +62,25 @@ func (rp {{$.Name}}Repo) Delete(ctx context.Context, filter Filter) (int64, erro
 }
 
 // Update Update
-func (rp {{$.Name}}Repo) Update(ctx context.Context, filter Filter, updates ...Updater) (int64, error){
-	updateStrs := make([]string, 0, len(updates))
-	updateArgs := make([]interface{}, 0, len(updates))
-	for _, update := range updates {
-		updateStrs = append(updateStrs, update.Set())
-		updateArgs = append(updateArgs, update.Arg())
+func (rp {{$.Name}}Repo) Update(ctx context.Context, filter Filter, updaters ...Updater) (int64, error){
+	var result sql.Result
+	var err error
+	updateStrs := make([]string, 0, len(updaters))
+	updateArgs := make([]interface{}, 0, len(updaters))
+	for _, updater := range updaters {
+		updateStrs = append(updateStrs, updater.Set())
+		updateArgs = append(updateArgs, updater.Arg())
 	}
-	sqlBaseStr := "{{.UpdateSQL}}  %s where %s"
-	sqlStr := fmt.Sprintf(sqlBaseStr, strings.Join(updateStrs,","), filter.Cond())
-	sqlArgs := append(updateArgs,filter.Args())
-	result, err := rp.db.ExecContext(ctx, sqlStr, sqlArgs...)
+	if filter.Cond() == "" {
+		sqlBaseStr := "{{.UpdateSQL}} %s"
+		sqlStr := fmt.Sprintf(sqlBaseStr, strings.Join(updateStrs,","))
+		result, err = rp.db.ExecContext(ctx, sqlStr, updateArgs...)
+	} else {
+		sqlBaseStr := "{{.UpdateSQL}} %s where %s"
+		sqlStr := fmt.Sprintf(sqlBaseStr, strings.Join(updateStrs,","), filter.Cond())
+		sqlArgs := append(updateArgs, filter.Args())
+		result, err = rp.db.ExecContext(ctx, sqlStr, sqlArgs...)
+	}
 	if err != nil {
 		return 0, err
 	}
@@ -110,8 +130,13 @@ type Updater interface {
 type Filter interface {
 	Cond() string
 	Args() []interface{}
-	Or(Filter) Filter
-	And(Filter) Filter
+}
+
+// JoinableFilter JoinableFilter
+type JoinableFilter interface  {
+	Filter
+	Or(Filter) JoinableFilter
+	And(Filter) JoinableFilter
 }
 
 type filter struct {
@@ -127,14 +152,14 @@ func (f *filter) Args() []interface{} {
 	return f.args
 }
 
-func (f *filter) And(and Filter) Filter {
+func (f *filter) And(and Filter) JoinableFilter {
 	return &filter{
 		cond: strings.Join([]string{"(", f.Cond(), ") and (", and.Cond(), ")"}, ""),
 		args: append(f.Args(), and.Args()...),
 	}
 }
 
-func (f *filter) Or(or Filter) Filter {
+func (f *filter) Or(or Filter) JoinableFilter {
 	return &filter{
 		cond: strings.Join([]string{"(", f.Cond(), ") or (", or.Cond(), ")"}, ""),
 		args: append(f.Args(), or.Args()...),
@@ -166,7 +191,7 @@ func (n {{$each.Name}}) Arg() interface{} {
 }
 
 // And And
-func (n {{$each.Name}}) And(f Filter) Filter {
+func (n {{$each.Name}}) And(f Filter) JoinableFilter {
 	return &filter{
 		cond: strings.Join([]string{"(", n.Cond(), ") and (", f.Cond(), ")"}, ""),
 		args: append(n.Args(), f.Args()...),
@@ -174,7 +199,7 @@ func (n {{$each.Name}}) And(f Filter) Filter {
 }
 
 // Or Or
-func (n {{$each.Name}}) Or(f Filter) Filter {
+func (n {{$each.Name}}) Or(f Filter) JoinableFilter {
 	return &filter{
 		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
 		args: append(n.Args(), f.Args()...),
