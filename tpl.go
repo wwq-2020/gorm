@@ -14,13 +14,25 @@ func New{{.Name}}Repo(db *sql.DB) *{{.Name}}Repo {
 }
 
 // Find Find
-func (rp {{$.Name}}Repo) Find(ctx context.Context, filter Filter) ([]*{{.Name}}, error){
+func (rp {{$.Name}}Repo) Find(ctx context.Context, filter Filter, sorters ...*Sorter) ([]*{{.Name}}, error){
 	var rows *sql.Rows
 	var err error
+	sortStr := " "
+	if len(sorters) != 0 {
+		sorterStrs := make([]string, 0, len(sorters))
+		for _, sorter := range sorters {
+			if sorter.sortStr == "" {
+				continue
+			}
+ 			sorterStrs = append(sorterStrs, string(sorter.sortStr))
+		}
+		sortStr = fmt.Sprintf(" order by %s", strings.Join(sorterStrs, ","))
+	}
 	if filter.Cond() == "" {
-		rows, err = rp.db.QueryContext(ctx, "{{.FindSQL}}")
+		sql :=  fmt.Sprintf("{{.FindSQL}}%s", sortStr)
+		rows, err = rp.db.QueryContext(ctx, sql)
 	} else {
-		sql:= fmt.Sprintf("{{.FindSQL}} where %s", filter.Cond())
+		sql := fmt.Sprintf("{{.FindSQL}} where %s%s", filter.Cond(), sortStr)
 		rows, err = rp.db.QueryContext(ctx, sql, filter.Args()... )
 	}
 	if err != nil {
@@ -166,6 +178,11 @@ func (f *filter) Or(or Filter) JoinableFilter {
 	}
 }
 
+// Sorter Sorter
+type Sorter struct {
+	sortStr string
+}
+
 {{range $idx,$each := .Fields}}
 // {{$each.Name}} {{$each.Name}}
 type {{$each.Name}} {{$each.Type}}
@@ -205,5 +222,14 @@ func (n {{$each.Name}}) Or(f Filter) JoinableFilter {
 		args: append(n.Args(), f.Args()...),
 	}
 }
+
+// SortBy{{$each.Name}} SortBy{{$each.Name}}
+func SortBy{{$each.Name}}(asc bool) *Sorter {
+	if asc {
+		return &Sorter{"{{$each.Column}} asc"}
+	}
+	return &Sorter{"{{$each.Column}} desc"}
+}
+
 {{end}}
 `

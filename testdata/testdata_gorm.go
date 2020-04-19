@@ -21,13 +21,25 @@ func NewUserRepo(db *sql.DB) *UserRepo {
 }
 
 // Find Find
-func (rp UserRepo) Find(ctx context.Context, filter Filter) ([]*User, error) {
+func (rp UserRepo) Find(ctx context.Context, filter Filter, sorters ...*Sorter) ([]*User, error) {
 	var rows *sql.Rows
 	var err error
+	sortStr := " "
+	if len(sorters) != 0 {
+		sorterStrs := make([]string, 0, len(sorters))
+		for _, sorter := range sorters {
+			if sorter.sortStr == "" {
+				continue
+			}
+			sorterStrs = append(sorterStrs, string(sorter.sortStr))
+		}
+		sortStr = fmt.Sprintf(" order by %s", strings.Join(sorterStrs, ","))
+	}
 	if filter.Cond() == "" {
-		rows, err = rp.db.QueryContext(ctx, "select id,name,password,created_at from user")
+		sql := fmt.Sprintf("select id,name,password,created_at from user%s", sortStr)
+		rows, err = rp.db.QueryContext(ctx, sql)
 	} else {
-		sql := fmt.Sprintf("select id,name,password,created_at from user where %s", filter.Cond())
+		sql := fmt.Sprintf("select id,name,password,created_at from user where %s%s", filter.Cond(), sortStr)
 		rows, err = rp.db.QueryContext(ctx, sql, filter.Args()...)
 	}
 	if err != nil {
@@ -173,6 +185,10 @@ func (f *filter) Or(or Filter) JoinableFilter {
 	}
 }
 
+type Sorter struct {
+	sortStr string
+}
+
 // ID ID
 type ID int64
 
@@ -210,6 +226,14 @@ func (n ID) Or(f Filter) JoinableFilter {
 		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
 		args: append(n.Args(), f.Args()...),
 	}
+}
+
+// SortByID SortByID
+func SortByID(asc bool) *Sorter {
+	if asc {
+		return &Sorter{"id asc"}
+	}
+	return &Sorter{"id desc"}
 }
 
 // Name Name
@@ -251,6 +275,14 @@ func (n Name) Or(f Filter) JoinableFilter {
 	}
 }
 
+// SortByName SortByName
+func SortByName(asc bool) *Sorter {
+	if asc {
+		return &Sorter{"name asc"}
+	}
+	return &Sorter{"name desc"}
+}
+
 // Password Password
 type Password string
 
@@ -290,6 +322,14 @@ func (n Password) Or(f Filter) JoinableFilter {
 	}
 }
 
+// SortByPassword SortByPassword
+func SortByPassword(asc bool) *Sorter {
+	if asc {
+		return &Sorter{"password asc"}
+	}
+	return &Sorter{"password desc"}
+}
+
 // CreatedAt CreatedAt
 type CreatedAt time.Time
 
@@ -327,4 +367,12 @@ func (n CreatedAt) Or(f Filter) JoinableFilter {
 		cond: strings.Join([]string{"(", n.Cond(), ") or (", f.Cond(), ")"}, ""),
 		args: append(n.Args(), f.Args()...),
 	}
+}
+
+// SortByCreatedAt SortByCreatedAt
+func SortByCreatedAt(asc bool) *Sorter {
+	if asc {
+		return &Sorter{"created_at asc"}
+	}
+	return &Sorter{"created_at desc"}
 }
