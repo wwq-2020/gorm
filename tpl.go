@@ -38,13 +38,14 @@ type tx struct {
 	db sqlCommon
 }
 
-// New{{.Name}}Repo New{{.Name}}Repo
+// NewRepo NewRepo
 func NewRepo(db *sql.DB) Repo {
 	return &repo{
 		tx{db: db},
 	}
 }
 
+// InTx InTx
 func (rp repo) InTx(ctx context.Context, txHandler TxHandler) error {
 	db, ok := rp.db.(sqlDB)
 	if !ok {
@@ -347,7 +348,7 @@ func WithLock() Option{
 }
 
 // WithJoinSorterBuilders WithJoinSorterBuilders
-func WithJoinSorterBuilder(joinSorterBuilders ...JoinableSorterBuilder) Option{
+func WithJoinSorterBuilders(joinSorterBuilders ...JoinableSorterBuilder) Option{
 	return func(o *options) {
 		result := joinSorterBuilders[0]
 		for _, joinSorterBuilder := range joinSorterBuilders[1:] {
