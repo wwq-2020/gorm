@@ -19,6 +19,7 @@ import (
 )
 
 type tpl struct {
+	PaginateFindSQL   string
 	Name              string
 	FindSQL           string
 	DeleteSQL         string
@@ -33,6 +34,7 @@ type tpl struct {
 	Fields            []*tplField
 	Lt                string
 	Bt                string
+	Tablename         string
 }
 
 type tplField struct {
@@ -163,6 +165,7 @@ func gen(structName, tableName string, buf *bytes.Buffer, st *ast.StructType) *t
 	value := make([]string, 0, len(fields))
 	placeHolder := make([]string, 0, len(fields))
 	tplFields := make([]*tplField, 0, len(fields))
+	idx := 0
 	for _, field := range fields {
 		if field.Tag == nil {
 			continue
@@ -190,7 +193,11 @@ func gen(structName, tableName string, buf *bytes.Buffer, st *ast.StructType) *t
 
 		trimedValue := strings.Trim(field.Tag.Value, "`")
 		curColumn := reflect.StructTag(trimedValue).Get("gorm")
-		column = append(column, curColumn)
+		column2Append := curColumn
+		if idx == 0 {
+			column2Append = tableName + "." + curColumn
+		}
+		column = append(column, column2Append)
 		name := field.Names[0].Name
 		value = append(value, "obj."+name)
 		scan = append(scan, `&result.`+name)
@@ -200,10 +207,12 @@ func gen(structName, tableName string, buf *bytes.Buffer, st *ast.StructType) *t
 			Type:   typ,
 			Column: curColumn,
 		})
+		idx++
 	}
 	return &tpl{
 		Name:              structName,
 		FindSQL:           fmt.Sprintf("select %s from %s", strings.Join(column, ","), tableName),
+		PaginateFindSQL:   fmt.Sprintf("select id from %s", tableName),
 		DeleteSQL:         fmt.Sprintf("delete from %s", tableName),
 		UpdateSQL:         fmt.Sprintf("update %s set", tableName),
 		CreateSQL:         fmt.Sprintf("insert into %s(%s) values", tableName, strings.Join(column[1:], ",")),
@@ -216,6 +225,7 @@ func gen(structName, tableName string, buf *bytes.Buffer, st *ast.StructType) *t
 		Fields:            tplFields,
 		Lt:                "<",
 		Bt:                ">",
+		Tablename:         tableName,
 	}
 
 }

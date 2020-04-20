@@ -79,28 +79,37 @@ func (tx tx) Find(ctx context.Context, filter Filter, opts ...Option) ([]*User, 
 	for _, opt := range opts {
 		opt(options)
 	}
-	sortStr := " "
+	sortStr := ""
 	if options.sorterBuilder != nil {
-		sortStr = fmt.Sprintf(" order by %s", options.sorterBuilder.Build())
+		sortStr = fmt.Sprintf(" order by %s ", options.sorterBuilder.Build())
 	}
 
-	paginate := " "
+	paginate := ""
 	if options.paginate != nil {
-		paginate = fmt.Sprintf(" limit %d, %d", options.paginate.offset, options.paginate.size)
+		paginate = fmt.Sprintf(" inner join (select id from user %s limit %d, %d) tmp on user.id = tmp.id ", sortStr, options.paginate.offset, options.paginate.size)
+		if filter != nil && filter.Cond() != "" {
+			paginate = fmt.Sprintf(" inner join (select id from user where %s %s limit %d, %d) tmp on user.id = tmp.id ", filter.Cond(), sortStr, options.paginate.offset, options.paginate.size)
+		}
 	}
 
-	withLock := " "
+	withLock := ""
 	if options.withLock {
-		withLock = " for update"
+		withLock = " for update "
 	}
 
 	var rows *sql.Rows
 	var err error
 	if filter == nil || filter.Cond() == "" {
-		sql := fmt.Sprintf("select id,name,password,created_at from user%s%s%s", sortStr, paginate, withLock)
+		sql := fmt.Sprintf("select user.id,name,password,created_at from user%s%s%s", sortStr, paginate, withLock)
+		if paginate != "" {
+			sql = fmt.Sprintf("select user.id,name,password,created_at from user%s%s", paginate, withLock)
+		}
 		rows, err = tx.db.QueryContext(ctx, sql)
 	} else {
-		sql := fmt.Sprintf("select id,name,password,created_at from user where %s%s%s%s", filter.Cond(), sortStr, paginate, withLock)
+		sql := fmt.Sprintf("select user.id,name,password,created_at from user where %s%s%s%s", filter.Cond(), sortStr, paginate, withLock)
+		if paginate != "" {
+			sql = fmt.Sprintf("select user.id,name,password,created_at from user %s%s", paginate, withLock)
+		}
 		rows, err = tx.db.QueryContext(ctx, sql, filter.Args()...)
 	}
 	if err != nil {
@@ -128,27 +137,33 @@ func (tx tx) FindOne(ctx context.Context, filter Filter, opts ...Option) (*User,
 		opt(options)
 	}
 
-	sortStr := " "
+	sortStr := ""
 	if options.sorterBuilder != nil {
-		sortStr = fmt.Sprintf(" order by %s", options.sorterBuilder.Build())
+		sortStr = fmt.Sprintf(" order by %s ", options.sorterBuilder.Build())
 	}
 
-	paginate := " "
+	paginate := ""
 	if options.paginate != nil {
-		paginate = fmt.Sprintf(" limit %d, %d", options.paginate.offset, options.paginate.size)
+		paginate = fmt.Sprintf(" limit %d, %d ", options.paginate.offset, options.paginate.size)
 	}
 
-	withLock := " "
+	withLock := ""
 	if options.withLock {
-		withLock = " for update"
+		withLock = " for update "
 	}
 
 	var row *sql.Row
 	if filter == nil || filter.Cond() == "" {
-		sql := fmt.Sprintf("select id,name,password,created_at from user%s%s%s", sortStr, paginate, withLock)
+		sql := fmt.Sprintf("select user.id,name,password,created_at from user%s%s%s", sortStr, paginate, withLock)
+		if paginate != "" {
+			sql = fmt.Sprintf("select user.id,name,password,created_at from user%s%s", paginate, withLock)
+		}
 		row = tx.db.QueryRowContext(ctx, sql)
 	} else {
-		sql := fmt.Sprintf("select id,name,password,created_at from user where %s%s%s%s", filter.Cond(), sortStr, paginate, withLock)
+		sql := fmt.Sprintf("select user.id,name,password,created_at from user where %s%s%s%s", filter.Cond(), sortStr, paginate, withLock)
+		if paginate != "" {
+			sql = fmt.Sprintf("select user.id,name,password,created_at from user %s%s", paginate, withLock)
+		}
 		row = tx.db.QueryRowContext(ctx, sql, filter.Args()...)
 	}
 	result := &User{}

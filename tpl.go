@@ -71,28 +71,37 @@ func (tx tx) Find(ctx context.Context, filter Filter, opts ...Option) ([]*{{.Nam
 	for _,opt := range opts {
 		opt(options)
 	}
-	sortStr := " "
+	sortStr := ""
 	if options.sorterBuilder != nil {
-		sortStr = fmt.Sprintf(" order by %s", options.sorterBuilder.Build())
+		sortStr = fmt.Sprintf(" order by %s ", options.sorterBuilder.Build())
 	}
 
-	paginate := " "
+	paginate := ""
 	if options.paginate != nil {
-		paginate = fmt.Sprintf(" limit %d, %d", options.paginate.offset, options.paginate.size)
+		paginate = fmt.Sprintf(" inner join ({{.PaginateFindSQL}} %s limit %d, %d) tmp on {{.Tablename}}.id = tmp.id ", sortStr, options.paginate.offset, options.paginate.size)
+		if filter != nil && filter.Cond() != "" {
+			paginate = fmt.Sprintf(" inner join ({{.PaginateFindSQL}} where %s %s limit %d, %d) tmp on {{.Tablename}}.id = tmp.id ", filter.Cond(), sortStr, options.paginate.offset, options.paginate.size)
+		}
 	}
 
-	withLock := " "
+	withLock := ""
 	if options.withLock {
-		withLock = " for update"
+		withLock = " for update "
 	}
 
 	var rows *sql.Rows
 	var err error
 	if filter == nil || filter.Cond() == "" {
 		sql :=  fmt.Sprintf("{{.FindSQL}}%s%s%s", sortStr, paginate, withLock)
+		if paginate != "" {
+			sql =  fmt.Sprintf("{{.FindSQL}}%s%s", paginate, withLock)
+		}
 		rows, err = tx.db.QueryContext(ctx, sql)
 	} else {
 		sql := fmt.Sprintf("{{.FindSQL}} where %s%s%s%s", filter.Cond(), sortStr, paginate, withLock)
+		if paginate != "" {
+			sql = fmt.Sprintf("{{.FindSQL}} %s%s", paginate, withLock)
+		}
 		rows, err = tx.db.QueryContext(ctx, sql, filter.Args()... )
 	}
 	if err != nil {
@@ -120,27 +129,33 @@ func (tx tx) FindOne(ctx context.Context, filter Filter, opts ...Option) (*{{.Na
 		opt(options)
 	}
 
-	sortStr := " "
+	sortStr := ""
 	if options.sorterBuilder != nil {
-		sortStr = fmt.Sprintf(" order by %s", options.sorterBuilder.Build())
+		sortStr = fmt.Sprintf(" order by %s ", options.sorterBuilder.Build())
 	}
 
-	paginate := " "
+	paginate := ""
 	if options.paginate != nil {
-		paginate = fmt.Sprintf(" limit %d, %d", options.paginate.offset, options.paginate.size)
+		paginate = fmt.Sprintf(" limit %d, %d ", options.paginate.offset, options.paginate.size)
 	}
 
-	withLock := " "
+	withLock := ""
 	if options.withLock {
-		withLock = " for update"
+		withLock = " for update "
 	}
 
 	var row *sql.Row
 	if filter == nil || filter.Cond() == "" {
 		sql :=  fmt.Sprintf("{{.FindSQL}}%s%s%s", sortStr, paginate, withLock)
+		if paginate != "" {
+			sql =  fmt.Sprintf("{{.FindSQL}}%s%s", paginate, withLock)
+		}
 		row= tx.db.QueryRowContext(ctx, sql)
 	} else {
 		sql := fmt.Sprintf("{{.FindSQL}} where %s%s%s%s", filter.Cond(), sortStr, paginate, withLock)
+		if paginate != "" {
+			sql = fmt.Sprintf("{{.FindSQL}} %s%s", paginate, withLock)
+		}
 		row= tx.db.QueryRowContext(ctx, sql, filter.Args()... )
 	}
 	result := &{{.Name}}{}
