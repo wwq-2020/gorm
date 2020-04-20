@@ -262,6 +262,17 @@ func WithSorterBuilder(sorterBuilder SorterBuilder) Option{
 	}
 }
 
+// WithJoinSorterBuilders WithJoinSorterBuilders
+func WithJoinSorterBuilder(joinSorterBuilders ...JoinSorterBuilder) Option{
+	return func(o *options) {
+		result := joinSorterBuilders[0]
+		for _, joinSorterBuilder := range joinSorterBuilders[1:] {
+			result = result.Join(joinSorterBuilder)
+		}
+		o.sorterBuilder = result
+	}
+}
+
 // Sorter Sorter
 type Sorter string
 
