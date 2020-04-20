@@ -31,7 +31,7 @@ func (rp {{$.Name}}Repo) Find(ctx context.Context, filter Filter, opts ...Option
 
 	var rows *sql.Rows
 	var err error
-	if filter.Cond() == "" {
+	if filter == nil || filter.Cond() == "" {
 		sql :=  fmt.Sprintf("{{.FindSQL}}%s%s", sortStr, paginate)
 		rows, err = rp.db.QueryContext(ctx, sql)
 	} else {
@@ -74,7 +74,7 @@ func (rp {{$.Name}}Repo) FindOne(ctx context.Context, filter Filter, opts ...Opt
 	}
 
 	var row *sql.Row
-	if filter.Cond() == "" {
+	if filter == nil || filter.Cond() == "" {
 		sql :=  fmt.Sprintf("{{.FindSQL}}%s%s", sortStr, paginate)
 		row= rp.db.QueryRowContext(ctx, sql)
 	} else {
@@ -92,7 +92,7 @@ func (rp {{$.Name}}Repo) FindOne(ctx context.Context, filter Filter, opts ...Opt
 func (rp {{$.Name}}Repo) Delete(ctx context.Context, filter Filter) (int64, error){
 	var result sql.Result
 	var err error
-	if filter.Cond() == "" {
+	if filter == nil || filter.Cond() == "" {
 		result, err = rp.db.ExecContext(ctx, "{{.DeleteSQL}}")
 	} else {
 		sql:=fmt.Sprintf("{{.DeleteSQL}} where %s", filter.Cond())
@@ -118,14 +118,14 @@ func (rp {{$.Name}}Repo) Update(ctx context.Context, filter Filter, updaters ...
 		updateStrs = append(updateStrs, updater.Set())
 		updateArgs = append(updateArgs, updater.Arg())
 	}
-	if filter.Cond() == "" {
+	if filter == nil || filter.Cond() == "" {
 		sqlBaseStr := "{{.UpdateSQL}} %s"
 		sqlStr := fmt.Sprintf(sqlBaseStr, strings.Join(updateStrs,","))
 		result, err = rp.db.ExecContext(ctx, sqlStr, updateArgs...)
 	} else {
 		sqlBaseStr := "{{.UpdateSQL}} %s where %s"
 		sqlStr := fmt.Sprintf(sqlBaseStr, strings.Join(updateStrs,","), filter.Cond())
-		sqlArgs := append(updateArgs, filter.Args())
+		sqlArgs := append(updateArgs, filter.Args()...)
 		result, err = rp.db.ExecContext(ctx, sqlStr, sqlArgs...)
 	}
 	if err != nil {
@@ -140,7 +140,7 @@ func (rp {{$.Name}}Repo) Update(ctx context.Context, filter Filter, updaters ...
 
 // Create Create
 func (rp {{.Name}}Repo) Create(ctx context.Context,obj *{{.Name}}) (int64, error) {
-	result, err := rp.db.ExecContext(ctx, "{{.CreateSQL}} ({{.PlaceHolder}})", {{.Value}})
+	result, err := rp.db.ExecContext(ctx, "{{.CreateSQL}} ({{.CreatePlaceHolder}})", {{.CreateValue}})
 	if err != nil {
 		return 0, err
 	}
@@ -157,8 +157,8 @@ func (rp {{.Name}}Repo) BatchCreate(ctx context.Context, objs []*{{.Name}}) erro
 	sqlPlaceHolder := make([]string, 0, len(objs))
 	sqlArgs := make([]interface{}, 0, len(objs)*{{.ColumnCount}})
 	for _, obj := range objs {
-		sqlPlaceHolder = append(sqlPlaceHolder, "({{.PlaceHolder}})")
-		sqlArgs = append(sqlArgs, {{.Value}})
+		sqlPlaceHolder = append(sqlPlaceHolder, "({{.CreatePlaceHolder}})")
+		sqlArgs = append(sqlArgs, {{.CreateValue}})
 	}
 	sqlStr := fmt.Sprintf(sqlBaseStr, strings.Join(sqlPlaceHolder, ","))
 	if _,err := rp.db.ExecContext(ctx, sqlStr, sqlArgs...); err != nil {
@@ -263,7 +263,7 @@ func WithSorterBuilder(sorterBuilder SorterBuilder) Option{
 }
 
 // WithJoinSorterBuilders WithJoinSorterBuilders
-func WithJoinSorterBuilder(joinSorterBuilders ...JoinSorterBuilder) Option{
+func WithJoinSorterBuilder(joinSorterBuilders ...JoinableSorterBuilder) Option{
 	return func(o *options) {
 		result := joinSorterBuilders[0]
 		for _, joinSorterBuilder := range joinSorterBuilders[1:] {

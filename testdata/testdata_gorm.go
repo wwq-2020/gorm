@@ -38,7 +38,7 @@ func (rp UserRepo) Find(ctx context.Context, filter Filter, opts ...Option) ([]*
 
 	var rows *sql.Rows
 	var err error
-	if filter.Cond() == "" {
+	if filter == nil || filter.Cond() == "" {
 		sql := fmt.Sprintf("select id,name,password,created_at from user%s%s", sortStr, paginate)
 		rows, err = rp.db.QueryContext(ctx, sql)
 	} else {
@@ -81,7 +81,7 @@ func (rp UserRepo) FindOne(ctx context.Context, filter Filter, opts ...Option) (
 	}
 
 	var row *sql.Row
-	if filter.Cond() == "" {
+	if filter == nil || filter.Cond() == "" {
 		sql := fmt.Sprintf("select id,name,password,created_at from user%s%s", sortStr, paginate)
 		row = rp.db.QueryRowContext(ctx, sql)
 	} else {
@@ -99,7 +99,7 @@ func (rp UserRepo) FindOne(ctx context.Context, filter Filter, opts ...Option) (
 func (rp UserRepo) Delete(ctx context.Context, filter Filter) (int64, error) {
 	var result sql.Result
 	var err error
-	if filter.Cond() == "" {
+	if filter == nil || filter.Cond() == "" {
 		result, err = rp.db.ExecContext(ctx, "delete from user")
 	} else {
 		sql := fmt.Sprintf("delete from user where %s", filter.Cond())
@@ -125,14 +125,14 @@ func (rp UserRepo) Update(ctx context.Context, filter Filter, updaters ...Update
 		updateStrs = append(updateStrs, updater.Set())
 		updateArgs = append(updateArgs, updater.Arg())
 	}
-	if filter.Cond() == "" {
+	if filter == nil || filter.Cond() == "" {
 		sqlBaseStr := "update user set %s"
 		sqlStr := fmt.Sprintf(sqlBaseStr, strings.Join(updateStrs, ","))
 		result, err = rp.db.ExecContext(ctx, sqlStr, updateArgs...)
 	} else {
 		sqlBaseStr := "update user set %s where %s"
 		sqlStr := fmt.Sprintf(sqlBaseStr, strings.Join(updateStrs, ","), filter.Cond())
-		sqlArgs := append(updateArgs, filter.Args())
+		sqlArgs := append(updateArgs, filter.Args()...)
 		result, err = rp.db.ExecContext(ctx, sqlStr, sqlArgs...)
 	}
 	if err != nil {
@@ -147,7 +147,7 @@ func (rp UserRepo) Update(ctx context.Context, filter Filter, updaters ...Update
 
 // Create Create
 func (rp UserRepo) Create(ctx context.Context, obj *User) (int64, error) {
-	result, err := rp.db.ExecContext(ctx, "insert into user(id,name,password,created_at) (?,?,?,?)", obj.ID, obj.Name, obj.Password, obj.CreatedAt)
+	result, err := rp.db.ExecContext(ctx, "insert into user(name,password,created_at) values (?,?,?)", obj.Name, obj.Password, obj.CreatedAt)
 	if err != nil {
 		return 0, err
 	}
@@ -160,12 +160,12 @@ func (rp UserRepo) Create(ctx context.Context, obj *User) (int64, error) {
 
 // BatchCreate BatchCreate
 func (rp UserRepo) BatchCreate(ctx context.Context, objs []*User) error {
-	sqlBaseStr := "insert into user(id,name,password,created_at) %s"
+	sqlBaseStr := "insert into user(name,password,created_at) values %s"
 	sqlPlaceHolder := make([]string, 0, len(objs))
 	sqlArgs := make([]interface{}, 0, len(objs)*4)
 	for _, obj := range objs {
-		sqlPlaceHolder = append(sqlPlaceHolder, "(?,?,?,?)")
-		sqlArgs = append(sqlArgs, obj.ID, obj.Name, obj.Password, obj.CreatedAt)
+		sqlPlaceHolder = append(sqlPlaceHolder, "(?,?,?)")
+		sqlArgs = append(sqlArgs, obj.Name, obj.Password, obj.CreatedAt)
 	}
 	sqlStr := fmt.Sprintf(sqlBaseStr, strings.Join(sqlPlaceHolder, ","))
 	if _, err := rp.db.ExecContext(ctx, sqlStr, sqlArgs...); err != nil {
@@ -266,6 +266,17 @@ func WithPaginate(offset int64, size int) Option {
 func WithSorterBuilder(sorterBuilder SorterBuilder) Option {
 	return func(o *options) {
 		o.sorterBuilder = sorterBuilder
+	}
+}
+
+// WithJoinSorterBuilders WithJoinSorterBuilders
+func WithJoinSorterBuilder(joinSorterBuilders ...JoinableSorterBuilder) Option {
+	return func(o *options) {
+		result := joinSorterBuilders[0]
+		for _, joinSorterBuilder := range joinSorterBuilders[1:] {
+			result = result.Join(joinSorterBuilder)
+		}
+		o.sorterBuilder = result
 	}
 }
 

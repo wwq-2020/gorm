@@ -19,18 +19,20 @@ import (
 )
 
 type tpl struct {
-	Name        string
-	FindSQL     string
-	DeleteSQL   string
-	UpdateSQL   string
-	CreateSQL   string
-	ColumnCount int
-	PlaceHolder string
-	Value       string
-	Scan        string
-	Fields      []*tplField
-	Lt          string
-	Bt          string
+	Name              string
+	FindSQL           string
+	DeleteSQL         string
+	UpdateSQL         string
+	CreateSQL         string
+	ColumnCount       int
+	CreatePlaceHolder string
+	PlaceHolder       string
+	Value             string
+	CreateValue       string
+	Scan              string
+	Fields            []*tplField
+	Lt                string
+	Bt                string
 }
 
 type tplField struct {
@@ -170,9 +172,18 @@ func gen(structName, tableName string, buf *bytes.Buffer, st *ast.StructType) *t
 		if !ok {
 			selector, ok := field.Type.(*ast.SelectorExpr)
 			if !ok {
-				continue
+				startExpr, ok := field.Type.(*ast.StarExpr)
+				if !ok {
+					continue
+				}
+				selector, ok = startExpr.X.(*ast.SelectorExpr)
+				if !ok {
+					continue
+				}
+				typ = selector.X.(*ast.Ident).Name + "." + selector.Sel.Name
+			} else {
+				typ = selector.X.(*ast.Ident).Name + "." + selector.Sel.Name
 			}
-			typ = selector.X.(*ast.Ident).Name + "." + selector.Sel.Name
 		} else {
 			typ = ident.Name
 		}
@@ -191,18 +202,20 @@ func gen(structName, tableName string, buf *bytes.Buffer, st *ast.StructType) *t
 		})
 	}
 	return &tpl{
-		Name:        structName,
-		FindSQL:     fmt.Sprintf("select %s from %s", strings.Join(column, ","), tableName),
-		DeleteSQL:   fmt.Sprintf("delete from %s", tableName),
-		UpdateSQL:   fmt.Sprintf("update %s set", tableName),
-		CreateSQL:   fmt.Sprintf("insert into %s(%s)", tableName, strings.Join(column, ",")),
-		ColumnCount: len(column),
-		PlaceHolder: strings.Join(placeHolder, ","),
-		Value:       strings.Join(value, ","),
-		Scan:        strings.Join(scan, ","),
-		Fields:      tplFields,
-		Lt:          "<",
-		Bt:          ">",
+		Name:              structName,
+		FindSQL:           fmt.Sprintf("select %s from %s", strings.Join(column, ","), tableName),
+		DeleteSQL:         fmt.Sprintf("delete from %s", tableName),
+		UpdateSQL:         fmt.Sprintf("update %s set", tableName),
+		CreateSQL:         fmt.Sprintf("insert into %s(%s) values", tableName, strings.Join(column[1:], ",")),
+		ColumnCount:       len(column),
+		CreatePlaceHolder: strings.Join(placeHolder[1:], ","),
+		PlaceHolder:       strings.Join(placeHolder, ","),
+		Value:             strings.Join(value, ","),
+		CreateValue:       strings.Join(value[1:], ","),
+		Scan:              strings.Join(scan, ","),
+		Fields:            tplFields,
+		Lt:                "<",
+		Bt:                ">",
 	}
 
 }
