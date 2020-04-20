@@ -1,20 +1,72 @@
 package main
 
 const tplStr = `
-// {{.Name}}Repo {{.Name}}Repo
-type {{.Name}}Repo struct{
-	db *sql.DB
+// TxHandler TxHandler
+type TxHandler func(ctx context.Context, tx Tx) error
+
+// Repo Repo
+type Repo interface {
+	InTx(ctx context.Context, txHandler TxHandler) error
+	Tx
+}
+
+// Tx Tx
+type Tx interface {
+	Find(ctx context.Context, filter Filter, opts ...Option) ([]*{{.Name}}, error)
+	FindOne(ctx context.Context, filter Filter, opts ...Option) (*{{.Name}}, error)
+	Delete(ctx context.Context, filter Filter) (int64, error)
+	Update(ctx context.Context, filter Filter, updaters ...Updater) (int64, error)
+	Create(ctx context.Context,obj *{{.Name}}) (int64, error)
+	BatchCreate(ctx context.Context, objs []*{{.Name}}) error
+}
+
+type sqlCommon interface {
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, ags ...interface{}) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
+}
+
+type sqlDB interface {
+	BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
+}
+
+type repo struct {
+	tx
+}
+
+type tx struct {
+	db sqlCommon
 }
 
 // New{{.Name}}Repo New{{.Name}}Repo
-func New{{.Name}}Repo(db *sql.DB) *{{.Name}}Repo {
-	return &{{.Name}}Repo{
-		db: db,
+func NewRepo(db *sql.DB) Repo {
+	return &repo{
+		tx{db: db},
 	}
 }
 
+func (rp repo) InTx(ctx context.Context, txHandler TxHandler) error {
+	db, ok := rp.db.(sqlDB)
+	if !ok {
+		return errors.New("do not support tx")
+	}
+	dbTx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer dbTx.Rollback()
+	tx := &tx{dbTx}
+	if err := txHandler(ctx, tx); err != nil {
+		return err
+	}
+	if err := dbTx.Commit(); err != nil {
+		return err
+	}
+	return nil
+}
+
 // Find Find
-func (rp {{$.Name}}Repo) Find(ctx context.Context, filter Filter, opts ...Option) ([]*{{.Name}}, error){
+func (tx tx) Find(ctx context.Context, filter Filter, opts ...Option) ([]*{{.Name}}, error) {
 	options:=&options{}
 	for _,opt := range opts {
 		opt(options)
@@ -29,14 +81,19 @@ func (rp {{$.Name}}Repo) Find(ctx context.Context, filter Filter, opts ...Option
 		paginate = fmt.Sprintf(" limit %d, %d", options.paginate.offset, options.paginate.size)
 	}
 
+	withLock := " "
+	if options.withLock {
+		withLock = " for update"
+	}
+
 	var rows *sql.Rows
 	var err error
 	if filter == nil || filter.Cond() == "" {
-		sql :=  fmt.Sprintf("{{.FindSQL}}%s%s", sortStr, paginate)
-		rows, err = rp.db.QueryContext(ctx, sql)
+		sql :=  fmt.Sprintf("{{.FindSQL}}%s%s%s", sortStr, paginate, withLock)
+		rows, err = tx.db.QueryContext(ctx, sql)
 	} else {
-		sql := fmt.Sprintf("{{.FindSQL}} where %s%s%s", filter.Cond(), sortStr, paginate)
-		rows, err = rp.db.QueryContext(ctx, sql, filter.Args()... )
+		sql := fmt.Sprintf("{{.FindSQL}} where %s%s%s%s", filter.Cond(), sortStr, paginate, withLock)
+		rows, err = tx.db.QueryContext(ctx, sql, filter.Args()... )
 	}
 	if err != nil {
 		return nil, err
@@ -57,7 +114,7 @@ func (rp {{$.Name}}Repo) Find(ctx context.Context, filter Filter, opts ...Option
 }
 
 // FindOne FindOne
-func (rp {{$.Name}}Repo) FindOne(ctx context.Context, filter Filter, opts ...Option) (*{{.Name}}, error){
+func (tx tx) FindOne(ctx context.Context, filter Filter, opts ...Option) (*{{.Name}}, error) {
 	options:=&options{}
 	for _,opt := range opts {
 		opt(options)
@@ -73,13 +130,18 @@ func (rp {{$.Name}}Repo) FindOne(ctx context.Context, filter Filter, opts ...Opt
 		paginate = fmt.Sprintf(" limit %d, %d", options.paginate.offset, options.paginate.size)
 	}
 
+	withLock := " "
+	if options.withLock {
+		withLock = " for update"
+	}
+
 	var row *sql.Row
 	if filter == nil || filter.Cond() == "" {
-		sql :=  fmt.Sprintf("{{.FindSQL}}%s%s", sortStr, paginate)
-		row= rp.db.QueryRowContext(ctx, sql)
+		sql :=  fmt.Sprintf("{{.FindSQL}}%s%s%s", sortStr, paginate, withLock)
+		row= tx.db.QueryRowContext(ctx, sql)
 	} else {
-		sql := fmt.Sprintf("{{.FindSQL}} where %s%s%s", filter.Cond(), sortStr, paginate)
-		row= rp.db.QueryRowContext(ctx, sql, filter.Args()... )
+		sql := fmt.Sprintf("{{.FindSQL}} where %s%s%s%s", filter.Cond(), sortStr, paginate, withLock)
+		row= tx.db.QueryRowContext(ctx, sql, filter.Args()... )
 	}
 	result := &{{.Name}}{}
 	if err := row.Scan({{.Scan|raw}}); err !=nil {
@@ -89,14 +151,14 @@ func (rp {{$.Name}}Repo) FindOne(ctx context.Context, filter Filter, opts ...Opt
 }
 
 // Delete Delete
-func (rp {{$.Name}}Repo) Delete(ctx context.Context, filter Filter) (int64, error){
+func (tx tx) Delete(ctx context.Context, filter Filter) (int64, error){
 	var result sql.Result
 	var err error
 	if filter == nil || filter.Cond() == "" {
-		result, err = rp.db.ExecContext(ctx, "{{.DeleteSQL}}")
+		result, err = tx.db.ExecContext(ctx, "{{.DeleteSQL}}")
 	} else {
 		sql:=fmt.Sprintf("{{.DeleteSQL}} where %s", filter.Cond())
-		result, err = rp.db.ExecContext(ctx, sql, filter.Args()... )
+		result, err = tx.db.ExecContext(ctx, sql, filter.Args()... )
 	}
 	if err != nil {
 		return 0, err
@@ -109,7 +171,7 @@ func (rp {{$.Name}}Repo) Delete(ctx context.Context, filter Filter) (int64, erro
 }
 
 // Update Update
-func (rp {{$.Name}}Repo) Update(ctx context.Context, filter Filter, updaters ...Updater) (int64, error){
+func (tx tx) Update(ctx context.Context, filter Filter, updaters ...Updater) (int64, error){
 	var result sql.Result
 	var err error
 	updateStrs := make([]string, 0, len(updaters))
@@ -121,12 +183,12 @@ func (rp {{$.Name}}Repo) Update(ctx context.Context, filter Filter, updaters ...
 	if filter == nil || filter.Cond() == "" {
 		sqlBaseStr := "{{.UpdateSQL}} %s"
 		sqlStr := fmt.Sprintf(sqlBaseStr, strings.Join(updateStrs,","))
-		result, err = rp.db.ExecContext(ctx, sqlStr, updateArgs...)
+		result, err = tx.db.ExecContext(ctx, sqlStr, updateArgs...)
 	} else {
 		sqlBaseStr := "{{.UpdateSQL}} %s where %s"
 		sqlStr := fmt.Sprintf(sqlBaseStr, strings.Join(updateStrs,","), filter.Cond())
 		sqlArgs := append(updateArgs, filter.Args()...)
-		result, err = rp.db.ExecContext(ctx, sqlStr, sqlArgs...)
+		result, err = tx.db.ExecContext(ctx, sqlStr, sqlArgs...)
 	}
 	if err != nil {
 		return 0, err
@@ -139,8 +201,8 @@ func (rp {{$.Name}}Repo) Update(ctx context.Context, filter Filter, updaters ...
 }
 
 // Create Create
-func (rp {{.Name}}Repo) Create(ctx context.Context,obj *{{.Name}}) (int64, error) {
-	result, err := rp.db.ExecContext(ctx, "{{.CreateSQL}} ({{.CreatePlaceHolder}})", {{.CreateValue}})
+func (tx tx) Create(ctx context.Context,obj *{{.Name}}) (int64, error) {
+	result, err := tx.db.ExecContext(ctx, "{{.CreateSQL}} ({{.CreatePlaceHolder}})", {{.CreateValue}})
 	if err != nil {
 		return 0, err
 	}
@@ -152,7 +214,7 @@ func (rp {{.Name}}Repo) Create(ctx context.Context,obj *{{.Name}}) (int64, error
 }
 
 // BatchCreate BatchCreate
-func (rp {{.Name}}Repo) BatchCreate(ctx context.Context, objs []*{{.Name}}) error {
+func (tx tx) BatchCreate(ctx context.Context, objs []*{{.Name}}) error {
 	sqlBaseStr := "{{.CreateSQL}} %s"
 	sqlPlaceHolder := make([]string, 0, len(objs))
 	sqlArgs := make([]interface{}, 0, len(objs)*{{.ColumnCount}})
@@ -161,7 +223,7 @@ func (rp {{.Name}}Repo) BatchCreate(ctx context.Context, objs []*{{.Name}}) erro
 		sqlArgs = append(sqlArgs, {{.CreateValue}})
 	}
 	sqlStr := fmt.Sprintf(sqlBaseStr, strings.Join(sqlPlaceHolder, ","))
-	if _,err := rp.db.ExecContext(ctx, sqlStr, sqlArgs...); err != nil {
+	if _,err := tx.db.ExecContext(ctx, sqlStr, sqlArgs...); err != nil {
 		return err
 	}
 	return nil
@@ -232,6 +294,7 @@ func (f *filter) Or(ors ...Filter) JoinableFilter {
 type options struct {
 	sorterBuilder SorterBuilder
 	paginate *paginate
+	withLock bool
 }
 
 type paginate struct{
@@ -259,6 +322,12 @@ func WithPaginate(offset int64, size int) Option {
 func WithSorterBuilder(sorterBuilder SorterBuilder) Option{
 	return func(o *options) {
 		o.sorterBuilder = sorterBuilder
+	}
+}
+
+func WithLock() Option{
+	return func(o *options) {
+		o.withLock = true
 	}
 }
 

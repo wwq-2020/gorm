@@ -25,7 +25,7 @@ func TestOp(t *testing.T) {
 		t.Fatalf("failed to open db,err: %#v\r\n", err)
 	}
 	now := time.Now()
-	repo := NewUserRepo(db)
+	repo := NewRepo(db)
 	givenUser := &User{
 		Name:      "user1",
 		Password:  "password1",
